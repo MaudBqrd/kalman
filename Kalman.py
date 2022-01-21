@@ -87,7 +87,7 @@ def eval_kalman(v_update_hat_tab, v_vehicle):
 
 if __name__ == '__main__':
 
-    path_to_traj = "/home/maud/Documents/mines/mareva/mini_projet/kalman_dataset/train/train_length_490_seq_0.npy"
+    path_to_traj = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/kalman_dataset/train/train_length_490_seq_0.npy"
 
     data = np.load(path_to_traj)
     a_vehicle = data[0]
@@ -99,7 +99,7 @@ if __name__ == '__main__':
     Q_tab = np.array(len(a_vehicle)*[0.25])
 
     v_predict_hat_tab, v_update_hat_tab, P_hat_tab = KalmanFilter1D(a_vehicle, v_wheel, R_tab, Q_tab)
-    KalmanVisualisation(v_predict_hat_tab, v_update_hat_tab, P_hat_tab, v_vehicle, v_wheel, a_vehicle, plot_all=False)
+    KalmanVisualisation(v_predict_hat_tab, v_update_hat_tab, P_hat_tab, v_vehicle, v_wheel, a_vehicle, plot_all=True)
     mse = eval_kalman(v_update_hat_tab, v_vehicle)
 
     plt.show()

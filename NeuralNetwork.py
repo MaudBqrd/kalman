@@ -34,7 +34,7 @@ test_dataloader = DataLoader(test_dataset, batch_size=batch_size)
 
 # Define model
 class NeuralNetwork(nn.Module):
-    def __init__(self, Q):
+    def __init__(self, Q, mean, sd):
         super(NeuralNetwork, self).__init__()
         self.conv = nn.Sequential(
             nn.Conv1d(2, 16, kernel_size= 5, padding=2, padding_mode='reflect'),
@@ -43,9 +43,12 @@ class NeuralNetwork(nn.Module):
             nn.ReLU(),
             nn.Conv1d(32, 64, kernel_size = 5, padding=2, padding_mode='reflect'),
             nn.ReLU(),
-            nn.Conv1d(64, 1, kernel_size = 5, padding=2, padding_mode='reflect')
+            nn.Conv1d(64, 1, kernel_size = 5, padding=2, padding_mode='reflect'),
+            nn.ReLU()
         )
         self.Q_tab = Q
+        self.mean = mean
+        self.sd = sd
 
 
     def KalmanPred1D(self, x_hat, F, B, u, P_hat, Q):
@@ -79,10 +82,12 @@ class NeuralNetwork(nn.Module):
     def forward(self, a_vehicle, v_wheel):
         x = torch.cat((torch.unsqueeze(a_vehicle, dim=1), torch.unsqueeze(v_wheel, dim=1)), dim=1)
         r = self.conv(x)
+        a_vehicle = a_vehicle * self.sd[0,0] + self.mean[0,0]
+        v_wheel = v_wheel * self.sd[1,0] + self.mean[1,0]
         y = self.KalmanFilter1D(a_vehicle, v_wheel, r)
-        return y
+        return y, r
 
-model = NeuralNetwork(Q=1)
+model = NeuralNetwork(Q=1, mean = mean, sd =std)
 print(model)
 
 loss_fn = nn.MSELoss()
@@ -98,8 +103,8 @@ def train(train_dataloader, val_dataloader, model, loss_fn, optimizer):
         a_vehicle, v_wheel, v_vehicle, idx = X
 
         # Compute prediction error
-        pred = model(a_vehicle, v_wheel)
-        loss = loss_fn(pred, v_vehicle)
+        pred,r = model(a_vehicle, v_wheel)
+        loss = loss_fn(pred, v_vehicle*std[2,0] + mean[2,0])
 
 
         # Backpropagation
@@ -122,8 +127,8 @@ def train(train_dataloader, val_dataloader, model, loss_fn, optimizer):
         a_vehicle, v_wheel, v_vehicle, idx = X
 
         # Compute prediction error
-        pred = model(a_vehicle, v_wheel)
-        loss = loss_fn(pred, v_vehicle)
+        pred, r = model(a_vehicle, v_wheel)
+        loss = loss_fn(pred, v_vehicle*std[2,0] + mean[2,0])
 
         lossVal.append(loss.item())
 
@@ -139,24 +144,29 @@ def test(test_dataloader, model, loss_fn):
         a_vehicle, v_wheel, v_vehicle, idx = X
 
         # Compute prediction error
-        pred = model(a_vehicle, v_wheel)
-        loss = loss_fn(pred, v_vehicle)
+        pred, r = model(a_vehicle, v_wheel)
+        loss = loss_fn(pred, v_vehicle*std[2,0] + mean[2,0])
 
         lossVal.append(loss.item())
 
     loss = np.mean(np.array(lossVal))
     print(f"Test loss: {loss:>7f}")
 
-epochs =10
-for t in range(epochs):
-    print(f"\nEpoch {t+1}\n-------------------------------")
-    train(train_dataloader, val_dataloader, model, loss_fn, optimizer)
-print("Done!")
 
-test(test_dataloader, model, loss_fn)
 
-if not os.path.exists('checkpoints'):
-    os.makedirs('checkpoints')
 
-torch.save(model.state_dict(), join("checkpoints","model.pth"))
-print("Saved PyTorch Model State to model.pth")
+
+if __name__ == '__main__':
+    epochs =30
+    for t in range(epochs):
+        print(f"\nEpoch {t+1}\n-------------------------------")
+        train(train_dataloader, val_dataloader, model, loss_fn, optimizer)
+    print("Done!")
+
+    test(test_dataloader, model, loss_fn)
+
+    if not os.path.exists('checkpoints'):
+        os.makedirs('checkpoints')
+
+    torch.save(model.state_dict(), join("checkpoints","model.pth"))
+    print("Saved PyTorch Model State to model.pth")
