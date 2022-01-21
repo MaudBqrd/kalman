@@ -34,16 +34,18 @@ def simu_to_dataset(path_dataset_simu, path_new_dataset, std_noise):
             a_vehicle += np.random.normal(0, std_noise[0], size=a_vehicle.shape)
             v_wheel += np.random.normal(0, std_noise[1], size=v_wheel.shape)
 
+            to_save = np.zeros((3, len(a_vehicle)))
+
             if 'TEST' in file:
                 save_path = join(path_new_dataset, 'test', f'test_length_{len(a_vehicle)}_seq_{i}.npy')
             else:
                 save_path = join(path_new_dataset, 'train', f'train_length_{len(a_vehicle)}_seq_{i}.npy')
 
-            data[0] = a_vehicle
-            data[1] = v_wheel
-            data[2] = v_vehicle
+            to_save[0] = a_vehicle
+            to_save[1] = v_wheel
+            to_save[2] = v_vehicle
 
-            np.save(save_path, data)
+            np.save(save_path, to_save)
 
 
 
