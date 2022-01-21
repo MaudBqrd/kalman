@@ -47,7 +47,7 @@ def compute_normalizing_constants_dataset(path_to_dataset, max_samples=1000):
         file = list_files[i]
         c_data = np.load(join(path_to_dataset, file))
         mean[:,0] += 1/n * np.mean(c_data, axis=1)
-        std[:, 0] += 1 / n * np.std(c_data, axis=1)
+        std[:, 0] += 1 /(n-1) * np.std(c_data, axis=1)
 
     return mean, std
 
@@ -56,7 +56,7 @@ if __name__ == '__main__':
 
     # test of nn_dataset functions
 
-    path_training_data = "/home/maud/Documents/mines/mareva/mini_projet/kalman_dataset/train"
+    path_training_data = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/kalman_dataset/train"
     mean, std = compute_normalizing_constants_dataset(path_training_data)
 
     train_dataset = KalmanDataset(path_training_data, mean, std)

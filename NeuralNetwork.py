@@ -1,112 +1,162 @@
+import numpy as np
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
 from torchvision import datasets
 from torchvision.transforms import ToTensor, Lambda, Compose
 import matplotlib.pyplot as plt
+from utils.nn_dataset import KalmanDataset, compute_normalizing_constants_dataset
+import os
+from os.path import join
 
 
-# Download training data from open datasets.
-training_data = datasets.FashionMNIST(
-    root="data",
-    train=True,
-    download=True,
-    transform=ToTensor(),
-)
+path_training_data = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/kalman_dataset/train"
+mean, std = compute_normalizing_constants_dataset(path_training_data)
 
-# Download test data from open datasets.
-test_data = datasets.FashionMNIST(
-    root="data",
-    train=False,
-    download=True,
-    transform=ToTensor(),
-)
+train_dataset = KalmanDataset(path_training_data, mean, std)
+a_vehicle, v_wheel, v_vehicle, idx = train_dataset[0]
 
+
+path_test_data = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/kalman_dataset/test"
+test_dataset = KalmanDataset(path_test_data, mean, std)
+
+path_val_data = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/kalman_dataset/val"
+val_dataset = KalmanDataset(path_val_data, mean, std)
 
 
 batch_size = 64
 
 # Create data loaders.
-train_dataloader = DataLoader(training_data, batch_size=batch_size)
-test_dataloader = DataLoader(test_data, batch_size=batch_size)
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size)
+val_dataloader = DataLoader(val_dataset, batch_size=batch_size)
+test_dataloader = DataLoader(test_dataset, batch_size=batch_size)
 
-for X, y in test_dataloader:
-    print("Shape of X [N, C, H, W]: ", X.shape)
-    print("Shape of y: ", y.shape, y.dtype)
-    break
-
-# Get cpu or gpu device for training.
-device = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"Using {device} device")
 
 # Define model
 class NeuralNetwork(nn.Module):
-    def __init__(self):
+    def __init__(self, Q):
         super(NeuralNetwork, self).__init__()
-        self.flatten = nn.Flatten()
-        self.linear_relu_stack = nn.Sequential(
-            nn.Linear(28*28, 512),
+        self.conv = nn.Sequential(
+            nn.Conv1d(2, 16, kernel_size= 5, padding=2, padding_mode='reflect'),
             nn.ReLU(),
-            nn.Linear(512, 512),
+            nn.Conv1d(16, 32, kernel_size= 5, padding=2, padding_mode='reflect'),
             nn.ReLU(),
-            nn.Linear(512, 10)
+            nn.Conv1d(32, 64, kernel_size = 5, padding=2, padding_mode='reflect'),
+            nn.ReLU(),
+            nn.Conv1d(64, 1, kernel_size = 5, padding=2, padding_mode='reflect')
         )
+        self.Q_tab = Q
 
-    def forward(self, x):
-        x = self.flatten(x)
-        logits = self.linear_relu_stack(x)
-        return logits
 
-model = NeuralNetwork().to(device)
+    def KalmanPred1D(self, x_hat, F, B, u, P_hat, Q):
+        x_hat = F * x_hat + B * u
+        P_hat = F * P_hat * F + Q
+        return x_hat, P_hat
+
+    def KalmanUpdate1D(self, x_hat, P_hat, z, H, R):
+        y = z - H * x_hat
+        S = H * P_hat * H + R
+        K = P_hat * H / S
+        x_hat = x_hat + K * y
+        P_hat = (1 - K * H) * P_hat
+        return x_hat, P_hat
+
+    def KalmanFilter1D(self, a_vehicle, v_wheel, R_tab):
+        batch_size = a_vehicle.shape[0]
+        v_hat = torch.zeros(batch_size)
+        P_hat = torch.zeros(batch_size)
+        t_final = a_vehicle.shape[1]
+
+        v_update_hat_tab = torch.zeros((batch_size,a_vehicle.shape[1]))
+
+        for t in range(t_final):
+            v_hat, P_hat = self.KalmanPred1D(v_hat, F=1, B=1, u=a_vehicle[:,t], P_hat=P_hat, Q= self.Q_tab)
+            v_hat, P_hat = self.KalmanUpdate1D(v_hat, P_hat, z=v_wheel[:,t], H=1, R=R_tab[:,0,t])
+            v_update_hat_tab[:,t] = v_hat
+
+        return v_update_hat_tab
+
+    def forward(self, a_vehicle, v_wheel):
+        x = torch.cat((torch.unsqueeze(a_vehicle, dim=1), torch.unsqueeze(v_wheel, dim=1)), dim=1)
+        r = self.conv(x)
+        y = self.KalmanFilter1D(a_vehicle, v_wheel, r)
+        return y
+
+model = NeuralNetwork(Q=1)
 print(model)
 
-loss_fn = nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(model.parameters(), lr=1e-3)
+loss_fn = nn.MSELoss()
+optimizer = torch.optim.Adam(model.parameters(), lr = 1e-2)
 
 
-
-def train(dataloader, model, loss_fn, optimizer):
-    size = len(dataloader.dataset)
+def train(train_dataloader, val_dataloader, model, loss_fn, optimizer):
+    size = len(train_dataloader.dataset)
     model.train()
-    for batch, (X, y) in enumerate(dataloader):
-        X, y = X.to(device), y.to(device)
+
+    loss_train = []
+    for batch, X in enumerate(train_dataloader):
+        a_vehicle, v_wheel, v_vehicle, idx = X
 
         # Compute prediction error
-        pred = model(X)
-        loss = loss_fn(pred, y)
+        pred = model(a_vehicle, v_wheel)
+        loss = loss_fn(pred, v_vehicle)
+
 
         # Backpropagation
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-        if batch % 100 == 0:
-            loss, current = loss.item(), batch * len(X)
-            print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+        loss_train.append(loss.item())
 
+    loss_mean_train = np.mean(np.array(loss_train))
+    print(f"loss: {loss_mean_train}\n")
 
-def test(dataloader, model, loss_fn):
-    size = len(dataloader.dataset)
-    num_batches = len(dataloader)
     model.eval()
-    test_loss, correct = 0, 0
-    with torch.no_grad():
-        for X, y in dataloader:
-            X, y = X.to(device), y.to(device)
-            pred = model(X)
-            test_loss += loss_fn(pred, y).item()
-            correct += (pred.argmax(1) == y).type(torch.float).sum().item()
-    test_loss /= num_batches
-    correct /= size
-    print(f"Test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
+
+    print("Validation")
+
+    lossVal = []
+
+    for batch, X in enumerate(val_dataloader):
+        a_vehicle, v_wheel, v_vehicle, idx = X
+
+        # Compute prediction error
+        pred = model(a_vehicle, v_wheel)
+        loss = loss_fn(pred, v_vehicle)
+
+        lossVal.append(loss.item())
 
 
-epochs = 5
+    loss= np.mean(np.array(lossVal))
+    print(f"Validation loss: {loss:>7f}")
+
+def test(test_dataloader, model, loss_fn):
+    print("Test \n")
+    lossVal = []
+
+    for batch, X in enumerate(test_dataloader):
+        a_vehicle, v_wheel, v_vehicle, idx = X
+
+        # Compute prediction error
+        pred = model(a_vehicle, v_wheel)
+        loss = loss_fn(pred, v_vehicle)
+
+        lossVal.append(loss.item())
+
+    loss = np.mean(np.array(lossVal))
+    print(f"Test loss: {loss:>7f}")
+
+epochs =10
 for t in range(epochs):
-    print(f"Epoch {t+1}\n-------------------------------")
-    train(train_dataloader, model, loss_fn, optimizer)
-    test(test_dataloader, model, loss_fn)
+    print(f"\nEpoch {t+1}\n-------------------------------")
+    train(train_dataloader, val_dataloader, model, loss_fn, optimizer)
 print("Done!")
 
+test(test_dataloader, model, loss_fn)
 
+if not os.path.exists('checkpoints'):
+    os.makedirs('checkpoints')
 
+torch.save(model.state_dict(), join("checkpoints","model.pth"))
+print("Saved PyTorch Model State to model.pth")
