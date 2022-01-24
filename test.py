@@ -1,9 +1,11 @@
 import numpy as np
+import torch
 from torch.utils.data import DataLoader
 from utils.kalman_filter_utils import KalmanFilter1D
 from utils.nn_dataset import KalmanDataset, compute_normalizing_constants_dataset
 from utils.kalman_networks import NeuralNetwork
 import torch.nn as nn
+import matplotlib.pyplot as plt
 
 
 def test(test_dataloader, model, loss_fn):
@@ -28,11 +30,59 @@ def test(test_dataloader, model, loss_fn):
     print(f"Test loss: {loss:>7f}")
 
 
+def test_realtime(test_dataloader, model, loss_fn, tronc_value):
+    print("Test \n")
+    lossVal = []
+
+    for batch, X in enumerate(test_dataloader):
+        a_vehicle, v_wheel, v_vehicle, idx = X
+        L = a_vehicle.shape[1]
+
+        r_hat = []
+
+        for t in range(L):
+            if t + 1 >= tronc_value:
+                a_vehicle_trunc = a_vehicle[:, t + 1 - tronc_value:t+1]
+                v_wheel_trunc = v_wheel[:, t + 1 - tronc_value:t + 1]
+                # v_vehicle_trunc = v_vehicle[:, t + 1 - tronc_value:t + 1]
+            else:
+                nb_zeros = tronc_value - t - 1
+                zeros_add = np.zeros((len(a_vehicle), nb_zeros))
+                a_vehicle_trunc = torch.from_numpy(np.concatenate((zeros_add, a_vehicle[:, 0:t+1]), axis=1).astype(np.float32))
+                v_wheel_trunc = torch.from_numpy(np.concatenate((zeros_add, v_wheel[:, 0:t+1]), axis=1).astype(np.float32))
+                # v_vehicle_trunc = np.concatenate((zeros_add, v_vehicle[:, 0:t + 1]), axis=1)
+
+            # Compute prediction error
+            r = model(a_vehicle_trunc, v_wheel_trunc)
+            r_hat.append(r[:, 0, -1])
+
+        r_hat = torch.reshape(torch.stack(r_hat), (batch_size, 1, -1))
+
+        a_vehicle = a_vehicle * std[0, 0] + mean[0, 0]
+        v_wheel = v_wheel * std[1, 0] + mean[1, 0]
+        pred = KalmanFilter1D(a_vehicle, v_wheel, r_hat, Q_tab=1)
+
+        plt.plot((v_vehicle * std[2, 0] + mean[2, 0])[0])
+        plt.plot(pred[0])
+        plt.figure()
+        plt.plot(r[0, 0])
+        plt.show()
+
+        exit(0)
+
+        loss = loss_fn(pred, v_vehicle*std[2,0] + mean[2,0])
+
+        lossVal.append(loss.item())
+
+    loss = np.mean(np.array(lossVal))
+    print(f"Test loss: {loss:>7f}")
+
+
 if __name__ == '__main__':
 
     # PARAMS
-    batch_size = 64
-    model_path = "checkpoints/model.pth"
+    batch_size = 1
+    model_path = "checkpoints/model_realtime.pth"
 
     # LOAD DATASET
 
@@ -50,4 +100,5 @@ if __name__ == '__main__':
 
     model = NeuralNetwork()
     loss_fn = nn.MSELoss()
-    test(test_dataloader, model, loss_fn)
+    # test(test_dataloader, model, loss_fn)
+    test_realtime(test_dataloader, model, loss_fn, tronc_value=30)
