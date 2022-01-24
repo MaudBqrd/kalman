@@ -68,7 +68,7 @@ if __name__ == '__main__':
 
     # HYPERPARAMETERS
 
-    epochs = 30
+    epochs = 10
     batch_size = 64
 
     # LOAD DATASET
@@ -99,7 +99,7 @@ if __name__ == '__main__':
         print(f"\nEpoch {t+1}\n-------------------------------")
         loss_train, loss_val = train(train_dataloader, val_dataloader, model, loss_fn, optimizer)
         train_loss.append(loss_train)
-        val_loss.append(val_loss)
+        val_loss.append(loss_val)
 
     print("Done!")
 
@@ -109,8 +109,8 @@ if __name__ == '__main__':
     torch.save(model.state_dict(), join("checkpoints","model.pth"))
     print("Saved PyTorch Model State to checkpoints/model.pth")
 
-    plt.plot(train_loss, label="train loss")
-    plt.plot(val_loss, label="val loss")
+    plt.plot(np.array(train_loss), label="train loss")
+    plt.plot(np.array(val_loss), label="val loss")
     plt.legend()
     plt.xlabel("Epochs")
     plt.show()
