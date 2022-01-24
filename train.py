@@ -5,7 +5,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from utils.kalman_networks import NeuralNetwork
-from utils.nn_dataset import KalmanDataset, compute_normalizing_constants_dataset
+from utils.nn_dataset import KalmanDataset, KalmanDatasetTronque, compute_normalizing_constants_dataset
 import os
 from os.path import join
 from utils.kalman_filter_utils import KalmanFilter1D
@@ -68,20 +68,20 @@ if __name__ == '__main__':
 
     # HYPERPARAMETERS
 
-    epochs = 10
+    epochs = 100
     batch_size = 64
 
     # LOAD DATASET
 
-    # path_training_data = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/kalman_dataset/train"
-    path_training_data = "/home/maud/Documents/mines/mareva/mini_projet/kalman_dataset/train"
+    path_training_data = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/kalman_dataset/train"
+    #path_training_data = "/home/maud/Documents/mines/mareva/mini_projet/kalman_dataset/train"
     mean, std = compute_normalizing_constants_dataset(path_training_data)
 
-    train_dataset = KalmanDataset(path_training_data, mean, std)
+    train_dataset = KalmanDatasetTronque(path_training_data, mean, std, 30)
 
-    path_val_data = "/home/maud/Documents/mines/mareva/mini_projet/kalman_dataset/val"
-    # path_val_data = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/kalman_dataset/val"
-    val_dataset = KalmanDataset(path_val_data, mean, std)
+    #path_val_data = "/home/maud/Documents/mines/mareva/mini_projet/kalman_dataset/val"
+    path_val_data = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/kalman_dataset/val"
+    val_dataset = KalmanDatasetTronque(path_val_data, mean, std, 30)
 
     # Create data loaders.
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size)
@@ -91,7 +91,7 @@ if __name__ == '__main__':
     # print(model)
 
     loss_fn = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
     train_loss = []
     val_loss = []

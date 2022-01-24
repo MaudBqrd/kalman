@@ -66,7 +66,6 @@ class KalmanDatasetTronque(data.Dataset):
             nb_zeros = self.tronc - temps_fin
             zeros_add = np.zeros((len(current_data), nb_zeros))
             data_tronc = np.concatenate((zeros_add, current_data[:, 0:temps_fin]), axis =1)
-            print(temps_fin, nb_zeros)
 
         data_tronc = (data_tronc - self.mean) / self.std
         a_vehicle, v_wheel, v_vehicle = data_tronc[0], data_tronc[1], data_tronc[2]

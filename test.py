@@ -47,9 +47,9 @@ def test_realtime(test_dataloader, model, loss_fn, tronc_value):
                 # v_vehicle_trunc = v_vehicle[:, t + 1 - tronc_value:t + 1]
             else:
                 nb_zeros = tronc_value - t - 1
-                zeros_add = np.zeros((len(a_vehicle), nb_zeros))
-                a_vehicle_trunc = torch.from_numpy(np.concatenate((zeros_add, a_vehicle[:, 0:t+1]), axis=1).astype(np.float32))
-                v_wheel_trunc = torch.from_numpy(np.concatenate((zeros_add, v_wheel[:, 0:t+1]), axis=1).astype(np.float32))
+                zeros_add = torch.zeros((len(a_vehicle), nb_zeros))
+                a_vehicle_trunc = torch.cat((zeros_add, a_vehicle[:, 0:t+1]), dim=1).to(torch.float32)
+                v_wheel_trunc = torch.cat((zeros_add, v_wheel[:, 0:t+1]), dim=1).to(torch.float32)
                 # v_vehicle_trunc = np.concatenate((zeros_add, v_vehicle[:, 0:t + 1]), axis=1)
 
             # Compute prediction error
@@ -63,9 +63,9 @@ def test_realtime(test_dataloader, model, loss_fn, tronc_value):
         pred = KalmanFilter1D(a_vehicle, v_wheel, r_hat, Q_tab=1)
 
         plt.plot((v_vehicle * std[2, 0] + mean[2, 0])[0])
-        plt.plot(pred[0])
+        plt.plot(pred[0].detach().numpy() )
         plt.figure()
-        plt.plot(r[0, 0])
+        plt.plot(r[0, 0].detach().numpy() )
         plt.show()
 
         exit(0)
@@ -86,12 +86,12 @@ if __name__ == '__main__':
 
     # LOAD DATASET
 
-    # path_training_data = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/kalman_dataset/train"
-    path_training_data = "/home/maud/Documents/mines/mareva/mini_projet/kalman_dataset/train"
+    path_training_data = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/kalman_dataset/train"
+    #path_training_data = "/home/maud/Documents/mines/mareva/mini_projet/kalman_dataset/train"
     mean, std = compute_normalizing_constants_dataset(path_training_data)
 
-    path_test_data = "/home/maud/Documents/mines/mareva/mini_projet/kalman_dataset/test"
-    # path_test_data = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/kalman_dataset/test"
+    #path_test_data = "/home/maud/Documents/mines/mareva/mini_projet/kalman_dataset/test"
+    path_test_data = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/kalman_dataset/test"
     test_dataset = KalmanDataset(path_test_data, mean, std)
 
     test_dataloader = DataLoader(test_dataset, batch_size=batch_size)

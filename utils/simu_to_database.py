@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 import os
 from os.path import join
 from numpy import loadtxt
@@ -63,7 +62,7 @@ def simu_to_dataset(path_dataset_simu, path_new_dataset, std_noise):
 
 
 if __name__ == '__main__':
-    path_to_dataset = "/home/maud/Documents/mines/mareva/mini_projet/dataset"
-    path_new_dataset = "/home/maud/Documents/mines/mareva/mini_projet/kalman_dataset"
+    path_to_dataset = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/dataset"
+    path_new_dataset = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/kalman_dataset"
 
     simu_to_dataset(path_to_dataset, path_new_dataset, std_noise=[1,3])
