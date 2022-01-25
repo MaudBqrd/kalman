@@ -35,6 +35,9 @@ def test_realtime(test_dataloader, model, loss_fn, tronc_value):
     lossVal = []
 
     for batch, X in enumerate(test_dataloader):
+
+        print(batch, len(test_dataloader))
+
         a_vehicle, v_wheel, v_vehicle, idx = X
         L = a_vehicle.shape[1]
 
@@ -60,15 +63,15 @@ def test_realtime(test_dataloader, model, loss_fn, tronc_value):
 
         a_vehicle = a_vehicle * std[0, 0] + mean[0, 0]
         v_wheel = v_wheel * std[1, 0] + mean[1, 0]
-        pred = KalmanFilter1D(a_vehicle, v_wheel, r_hat, Q_tab=1)
+        pred, P_hat_tab = KalmanFilter1D(a_vehicle, v_wheel, r_hat, Q_tab=1, ret_P_hat=True)
 
-        plt.plot((v_vehicle * std[2, 0] + mean[2, 0])[0])
+        """plt.plot((v_vehicle * std[2, 0] + mean[2, 0])[0])
         plt.plot(pred[0].detach().numpy() )
         plt.figure()
-        plt.plot(r[0, 0].detach().numpy() )
-        plt.show()
-
-        exit(0)
+        plt.plot(r_hat[0, 0].detach().numpy() )
+        plt.figure()
+        plt.plot(P_hat_tab[0].detach().numpy())
+        plt.show()"""
 
         loss = loss_fn(pred, v_vehicle*std[2,0] + mean[2,0])
 
@@ -82,16 +85,18 @@ if __name__ == '__main__':
 
     # PARAMS
     batch_size = 1
-    model_path = "checkpoints/model_realtime.pth"
+    # model_path = "checkpoints/model2.pth"
+    model_path = "checkpoints/model_realtime_3.pth"
 
     # LOAD DATASET
 
-    path_training_data = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/kalman_dataset/train"
-    #path_training_data = "/home/maud/Documents/mines/mareva/mini_projet/kalman_dataset/train"
+    # path_training_data = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/kalman_dataset/train"
+    path_training_data = "/home/maud/Documents/mines/mareva/mini_projet/kalman_dataset/train"
     mean, std = compute_normalizing_constants_dataset(path_training_data)
 
-    #path_test_data = "/home/maud/Documents/mines/mareva/mini_projet/kalman_dataset/test"
-    path_test_data = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/kalman_dataset/test"
+    path_test_data = "/home/maud/Documents/mines/mareva/mini_projet/kalman_dataset/test_sample"
+    # path_test_data = "/home/maud/Documents/mines/mareva/mini_projet/kalman_dataset/test"
+    # path_test_data = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/kalman_dataset/test"
     test_dataset = KalmanDataset(path_test_data, mean, std)
 
     test_dataloader = DataLoader(test_dataset, batch_size=batch_size)
@@ -99,6 +104,7 @@ if __name__ == '__main__':
     # TEST FCT
 
     model = NeuralNetwork()
+    model.load_state_dict(torch.load(model_path))
     loss_fn = nn.MSELoss()
     # test(test_dataloader, model, loss_fn)
-    test_realtime(test_dataloader, model, loss_fn, tronc_value=30)
+    test_realtime(test_dataloader, model, loss_fn, tronc_value=10)

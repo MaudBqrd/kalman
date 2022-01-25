@@ -11,7 +11,13 @@ from os.path import join
 from utils.kalman_filter_utils import KalmanFilter1D
 
 
-def train(train_dataloader, val_dataloader, model, loss_fn, optimizer):
+def weighted_mse_loss(input, target):
+    weight = torch.ones_like(input)
+    weight[:,-1] = 2
+    return torch.mean(weight * (input - target) ** 2)
+
+
+def train(train_dataloader, val_dataloader, model, loss_fn, optimizer, mean, std):
     model.train()
 
     loss_train = []
@@ -23,7 +29,7 @@ def train(train_dataloader, val_dataloader, model, loss_fn, optimizer):
 
         a_vehicle = a_vehicle * std[0, 0] + mean[0, 0]
         v_wheel = v_wheel * std[1,0] + mean[1,0]
-        pred = KalmanFilter1D(a_vehicle, v_wheel, r, Q_tab=1)
+        pred = KalmanFilter1D(a_vehicle, v_wheel, r, Q_tab=1, v_init=std[2,0]*v_vehicle[:,0] + mean[2,0])
 
         loss = loss_fn(pred, v_vehicle*std[2,0] + mean[2,0])
 
@@ -51,12 +57,11 @@ def train(train_dataloader, val_dataloader, model, loss_fn, optimizer):
 
         a_vehicle = a_vehicle * std[0, 0] + mean[0, 0]
         v_wheel = v_wheel * std[1, 0] + mean[1, 0]
-        pred = KalmanFilter1D(a_vehicle, v_wheel, r, Q_tab=1)
+        pred = KalmanFilter1D(a_vehicle, v_wheel, r, Q_tab=1, v_init=std[2,0]*v_vehicle[:,0] + mean[2,0])
 
         loss = loss_fn(pred, v_vehicle*std[2,0] + mean[2,0])
 
         lossVal.append(loss.item())
-
 
     loss_mean_val = np.mean(np.array(lossVal))
     print(f"Validation loss: {loss_mean_val:>7f}")
@@ -68,36 +73,42 @@ if __name__ == '__main__':
 
     # HYPERPARAMETERS
 
-    epochs = 100
+    epochs = 150
     batch_size = 64
+    truncate_size = 30
+    lr = 1e-3
+    weight_decay = 1e-4
 
     # LOAD DATASET
 
-    path_training_data = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/kalman_dataset/train"
-    #path_training_data = "/home/maud/Documents/mines/mareva/mini_projet/kalman_dataset/train"
+    # path_training_data = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/kalman_dataset/train"
+    path_training_data = "/home/maud/Documents/mines/mareva/mini_projet/kalman_dataset/train"
     mean, std = compute_normalizing_constants_dataset(path_training_data)
 
-    train_dataset = KalmanDatasetTronque(path_training_data, mean, std, 30)
+    train_dataset = KalmanDatasetTronque(path_training_data, mean, std, truncate_size)
+    # train_dataset = KalmanDataset(path_training_data, mean, std)
 
-    #path_val_data = "/home/maud/Documents/mines/mareva/mini_projet/kalman_dataset/val"
-    path_val_data = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/kalman_dataset/val"
-    val_dataset = KalmanDatasetTronque(path_val_data, mean, std, 30)
+    path_val_data = "/home/maud/Documents/mines/mareva/mini_projet/kalman_dataset/val"
+    # path_val_data = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/kalman_dataset/val"
+    # val_dataset = KalmanDataset(path_val_data, mean, std)
+    val_dataset = KalmanDatasetTronque(path_val_data, mean, std, truncate_size)
 
     # Create data loaders.
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size)
     val_dataloader = DataLoader(val_dataset, batch_size=batch_size)
 
-    model = NeuralNetwork()
+    model = NeuralNetwork(kernel_size=5, padding=2)
     # print(model)
 
     loss_fn = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    # loss_fn = weighted_mse_loss
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
     train_loss = []
     val_loss = []
     for t in range(epochs):
         print(f"\nEpoch {t+1}\n-------------------------------")
-        loss_train, loss_val = train(train_dataloader, val_dataloader, model, loss_fn, optimizer)
+        loss_train, loss_val = train(train_dataloader, val_dataloader, model, loss_fn, optimizer, mean ,std)
         train_loss.append(loss_train)
         val_loss.append(loss_val)
 
@@ -106,8 +117,8 @@ if __name__ == '__main__':
     if not os.path.exists('checkpoints'):
         os.makedirs('checkpoints')
 
-    torch.save(model.state_dict(), join("checkpoints","model.pth"))
-    print("Saved PyTorch Model State to checkpoints/model.pth")
+    torch.save(model.state_dict(), join("checkpoints","model_realtime_3w.pth"))
+    print("Saved PyTorch Model State to checkpoints/model_realtime_3w.pth")
 
     plt.plot(np.array(train_loss), label="train loss")
     plt.plot(np.array(val_loss), label="val loss")
