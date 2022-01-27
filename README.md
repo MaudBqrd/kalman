@@ -8,6 +8,6 @@ The aim of this work is to combine two measurements thanks to a Kalman filter :
 
 The wheel can slide. This is considered as a supplementary noise for v\_wheel in the Kalman filter.
 
-Further information can be found in the slides contained in the file "Presentation".
+Further information can be found in the slides contained in the file "slides.pdf".
 
 We used Colin Pareiller' simulator to generate the data. It can be found at https://github.com/colin-ai/tire-slip-simulator/ or by contacting Colin Pareiller.
