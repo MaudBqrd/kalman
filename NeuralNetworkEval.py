@@ -8,11 +8,11 @@ import matplotlib.pyplot as plt
 from utils.nn_dataset import KalmanDataset, KalmanDatasetTronque, compute_normalizing_constants_dataset
 import os
 from os.path import join
-from utils.kalman_networks import NeuralNetwork
+from utils.kalman_networks import NeuralNetwork, NeuralNetwork
 from utils.kalman_filter_utils import KalmanFilter1D
 import matplotlib.pyplot as plt
 
-
+# VISUALISATION / COMPARISON OF REALTIME AND NOT REALTIME NETWORK
 
 # path_training_data = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/kalman_dataset/train"
 path_training_data = "/home/maud/Documents/mines/mareva/mini_projet/kalman_dataset/train"
@@ -22,17 +22,21 @@ path_test_data = "/home/maud/Documents/mines/mareva/mini_projet/kalman_dataset/t
 # path_test_data = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/kalman_dataset/test"
 test_dataset = KalmanDataset(path_test_data, mean, std)
 
+
 batch_size = 1
 
 # Create data loaders.
 test_dataloader = DataLoader(test_dataset, batch_size=batch_size)
 
+# MODEL FUTURE
 model = NeuralNetwork()
-model.load_state_dict(torch.load("checkpoints/model2.pth"))
+model.load_state_dict(torch.load("checkpoints/model_deep.pth"))
 model.eval()
 
+# MODEL REALTIME
 model_realtime = NeuralNetwork()
-model_realtime.load_state_dict(torch.load("checkpoints/model_realtime_3w.pth"))
+# model_realtime = NeuralNetwork(kernel_size=5, padding=2, padding_mode='reflect')
+model_realtime.load_state_dict(torch.load("checkpoints/model_deep_realtime.pth"))
 model_realtime.eval()
 
 for  _, (a_vehicle, v_wheel, v_vehicle, idx) in enumerate(test_dataloader):
@@ -49,7 +53,7 @@ for  _, (a_vehicle, v_wheel, v_vehicle, idx) in enumerate(test_dataloader):
         # pred realtime
         r_hat = []
         L = a_vehicle.shape[1]
-        tronc_value = 10
+        tronc_value = 30
 
         for t in range(L):
             if t + 1 >= tronc_value:
@@ -72,16 +76,26 @@ for  _, (a_vehicle, v_wheel, v_vehicle, idx) in enumerate(test_dataloader):
         pred_realtime, _ = KalmanFilter1D(a_vehicle, v_wheel, r_hat, Q_tab=1, ret_P_hat=True, v_init=v_wheel[:, 0])
 
 
-        fig, (ax1,ax2) = plt.subplots(1,2)
-        ax1.plot((v_vehicle*std[2,0] + mean[2,0])[0])
-        ax1.plot(pred[0], label='r futur')
-        ax2.plot((v_vehicle * std[2, 0] + mean[2, 0])[0])
-        ax2.plot(pred_realtime[0], label='r real time')
+        fig = plt.figure()
+        plt.plot((v_vehicle*std[2,0] + mean[2,0])[0], label='v_vehicle (gt)')
+        plt.plot(np.array(v_wheel[0]), '--', label='v_wheel', color="green")
+        plt.plot(pred[0], label='v_vehicle estimée (futur)')
+        ax = plt.gca()
+        ax.set(xlabel="t [s]", ylabel="v [m/s]")
         plt.legend()
+        # plt.show()
 
         fig = plt.figure()
-        plt.plot(r_futur[0, 0], label='r futur')
-        plt.plot(r_hat[0, 0].detach().numpy(), label='r real time')
+        plt.plot((v_vehicle * std[2, 0] + mean[2, 0])[0],  label='v_vehicle (gt)')
+        plt.plot(np.array(v_wheel[0]), '--', label='v_wheel', color="green")
+        plt.plot(pred_realtime[0], label='v_vehicle estimée (temps réel)')
+        plt.legend()
+        ax = plt.gca()
+        ax.set(xlabel="t [s]", ylabel="v [m/s]")
+
+        fig = plt.figure()
+        plt.plot(r_futur[0, 0], label='R_hat estimé (futur)')
+        plt.plot(r_hat[0, 0].detach().numpy(), label='R_hat estimé (temps réel)')
         plt.legend()
         plt.show()
 

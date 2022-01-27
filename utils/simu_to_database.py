@@ -4,6 +4,7 @@ from os.path import join
 from numpy import loadtxt
 import matplotlib.pyplot as plt
 
+# PREPROCESSING FUNCTIONS
 
 def convert_v_to_a(v):
     a = np.gradient(v)
@@ -56,6 +57,19 @@ def simu_to_dataset(path_dataset_simu, path_new_dataset, std_noise):
             to_save[0] = a_vehicle
             to_save[1] = v_wheel
             to_save[2] = v_vehicle
+
+            plt.plot(a_vehicle, label='a_vehicle')
+            ax = plt.gca()
+            ax.set(xlabel="t [s]", ylabel="a [m/s²]")
+            plt.legend()
+            plt.figure()
+            plt.plot(v_wheel, label='v_wheel')
+            ax = plt.gca()
+            ax.set(xlabel="t [s]", ylabel="v [m/s]")
+            plt.legend()
+
+            plt.show()
+            exit(0)
 
             np.save(save_path, to_save)
 

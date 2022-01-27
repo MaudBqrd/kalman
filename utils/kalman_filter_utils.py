@@ -18,7 +18,7 @@ def KalmanUpdate1D(x_hat, P_hat, z, H, R):
 def KalmanFilter1D(a_vehicle, v_wheel, r, Q_tab, ret_P_hat=False, v_init=None):
     batch_size = a_vehicle.shape[0]
     v_hat = torch.zeros(batch_size)
-    P_hat = torch.zeros(batch_size)
+    P_hat = torch.ones(batch_size)
     t_final = a_vehicle.shape[1]
 
     if v_init is not None:

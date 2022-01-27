@@ -3,12 +3,14 @@ import torch
 from torch.utils.data import DataLoader
 from utils.kalman_filter_utils import KalmanFilter1D
 from utils.nn_dataset import KalmanDataset, compute_normalizing_constants_dataset
-from utils.kalman_networks import NeuralNetwork
+from utils.kalman_networks import NeuralNetwork, NeuralNetwork
 import torch.nn as nn
 import matplotlib.pyplot as plt
 
-
 def test(test_dataloader, model, loss_fn):
+    """
+    Test function for network which sees future
+    """
     print("Test \n")
     lossVal = []
 
@@ -30,7 +32,10 @@ def test(test_dataloader, model, loss_fn):
     print(f"Test loss: {loss:>7f}")
 
 
-def test_realtime(test_dataloader, model, loss_fn, tronc_value):
+def test_realtime(test_dataloader, model, loss_fn, tronc_value, visu=False):
+    """
+    Test function for realtime network
+    """
     print("Test \n")
     lossVal = []
 
@@ -63,15 +68,18 @@ def test_realtime(test_dataloader, model, loss_fn, tronc_value):
 
         a_vehicle = a_vehicle * std[0, 0] + mean[0, 0]
         v_wheel = v_wheel * std[1, 0] + mean[1, 0]
-        pred, P_hat_tab = KalmanFilter1D(a_vehicle, v_wheel, r_hat, Q_tab=1, ret_P_hat=True)
+        pred, P_hat_tab = KalmanFilter1D(a_vehicle, v_wheel, r_hat, Q_tab=1, ret_P_hat=True, v_init=v_wheel[:,0])
 
-        """plt.plot((v_vehicle * std[2, 0] + mean[2, 0])[0])
-        plt.plot(pred[0].detach().numpy() )
-        plt.figure()
-        plt.plot(r_hat[0, 0].detach().numpy() )
-        plt.figure()
-        plt.plot(P_hat_tab[0].detach().numpy())
-        plt.show()"""
+        if visu:
+            plt.plot((v_vehicle * std[2, 0] + mean[2, 0])[0])
+            plt.plot(pred[0].detach().numpy() )
+            plt.figure()
+            plt.plot(r_hat[0, 0].detach().numpy() )
+            plt.plot((v_wheel - (v_vehicle * std[2, 0] + mean[2, 0]))[0])
+            plt.figure()
+            plt.plot(P_hat_tab[0].detach().numpy())
+            plt.show()
+            exit("Process exited. Set visu to False to test on whole trajectories ")
 
         loss = loss_fn(pred, v_vehicle*std[2,0] + mean[2,0])
 
@@ -85,8 +93,7 @@ if __name__ == '__main__':
 
     # PARAMS
     batch_size = 1
-    # model_path = "checkpoints/model2.pth"
-    model_path = "checkpoints/model_realtime_3.pth"
+    model_path = "checkpoints/model_deep_realtime.pth"
 
     # LOAD DATASET
 
@@ -95,7 +102,6 @@ if __name__ == '__main__':
     mean, std = compute_normalizing_constants_dataset(path_training_data)
 
     path_test_data = "/home/maud/Documents/mines/mareva/mini_projet/kalman_dataset/test_sample"
-    # path_test_data = "/home/maud/Documents/mines/mareva/mini_projet/kalman_dataset/test"
     # path_test_data = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/kalman_dataset/test"
     test_dataset = KalmanDataset(path_test_data, mean, std)
 
@@ -106,5 +112,9 @@ if __name__ == '__main__':
     model = NeuralNetwork()
     model.load_state_dict(torch.load(model_path))
     loss_fn = nn.MSELoss()
+
+    # test for network which sees future
     # test(test_dataloader, model, loss_fn)
-    test_realtime(test_dataloader, model, loss_fn, tronc_value=10)
+
+    # test realtime
+    test_realtime(test_dataloader, model, loss_fn, tronc_value=30, visu=False)

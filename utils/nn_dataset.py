@@ -8,7 +8,7 @@ from os.path import join
 
 class KalmanDataset(data.Dataset):
     """
-    torch dataset for training on Kalman filter
+    torch dataset for training on Kalman filter for network which sees the future
     """
 
     def __init__(self, path_to_dataset, norm_mean, norm_std):
@@ -38,7 +38,7 @@ class KalmanDataset(data.Dataset):
 
 class KalmanDatasetTronque(data.Dataset):
     """
-    torch dataset for training on Kalman filter
+    torch dataset for training on Kalman filter for realtime network
     """
 
     def __init__(self, path_to_dataset, norm_mean, norm_std, troncature):

@@ -45,15 +45,16 @@ def calcul_l_min(train_dataloader, model, tronc_value):
 
 
 if __name__ == '__main__':
+    # TO GET A BOUND on the training loss
 
     # PARAMS
     batch_size = 64
-    model_path = "checkpoints/model_realtime.pth"
+    model_path = "checkpoints/model_deep_realtime.pth"
 
     # LOAD DATASET
 
-    path_training_data = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/kalman_dataset/train"
-    #path_training_data = "/home/maud/Documents/mines/mareva/mini_projet/kalman_dataset/train"
+    # path_training_data = "/home/nathan/Bureau/Mines/MAREVA/Mini projet/kalman_dataset/train"
+    path_training_data = "/home/maud/Documents/mines/mareva/mini_projet/kalman_dataset/train"
     mean, std = compute_normalizing_constants_dataset(path_training_data)
 
     train_dataset = KalmanDataset(path_training_data, mean, std)
@@ -64,6 +65,13 @@ if __name__ == '__main__':
 
     model = NeuralNetwork()
     model.load_state_dict(torch.load(model_path))
+
     loss_fn = nn.MSELoss()
     # test(test_dataloader, model, loss_fn)
-    print(calcul_l_min(train_dataloader, model, tronc_value=30))
+
+    mean_tab = []
+
+    for i in range(100):
+        mean_tab.append(calcul_l_min(train_dataloader, model, tronc_value=30))
+
+    print("l_min : ", np.mean(mean_tab))
